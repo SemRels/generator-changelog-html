@@ -1,0 +1,150 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 The generator-changelog-html Authors
+
+package plugin
+
+import (
+	"fmt"
+	"html"
+	"regexp"
+	"strings"
+	"time"
+)
+
+const (
+	breakingChangesSection = "Breaking Changes"
+	featuresSection        = "Features"
+	bugFixesSection        = "Bug Fixes"
+	otherChangesSection    = "Other Changes"
+)
+
+type ReleaseContext struct {
+	Version        string
+	CurrentVersion string
+	Branch         string
+	Commits        []string
+}
+
+type Generator struct {
+	now func() time.Time
+}
+
+var conventionalHeaderPattern = regexp.MustCompile(`^(\w+)(\([\w-]+\))?(!)?:(.+)$`)
+
+func New() *Generator {
+	return &Generator{now: time.Now}
+}
+
+func (g *Generator) Generate(ctx ReleaseContext) string {
+	sections := map[string][]string{}
+	for _, commit := range ctx.Commits {
+		section, line := classifyCommit(commit)
+		if section == "" || line == "" {
+			continue
+		}
+		sections[section] = append(sections[section], line)
+	}
+
+	var builder strings.Builder
+	builder.WriteString("<section class=\"changelog-entry\">\n")
+	fmt.Fprintf(&builder, "  <h2>%s <small>%s</small></h2>\n", html.EscapeString(displayVersion(ctx.Version)), g.currentDate().Format("2006-01-02"))
+
+	if meta := metadataLine(ctx); meta != "" {
+		fmt.Fprintf(&builder, "  <p>%s</p>\n", html.EscapeString(meta))
+	}
+
+	for _, section := range []string{breakingChangesSection, featuresSection, bugFixesSection, otherChangesSection} {
+		lines := sections[section]
+		if len(lines) == 0 {
+			continue
+		}
+
+		fmt.Fprintf(&builder, "  <h3>%s</h3>\n", html.EscapeString(section))
+		builder.WriteString("  <ul>\n")
+		for _, line := range lines {
+			fmt.Fprintf(&builder, "    <li>%s</li>\n", html.EscapeString(line))
+		}
+		builder.WriteString("  </ul>\n")
+	}
+
+	builder.WriteString("</section>")
+	return builder.String()
+}
+
+func (g *Generator) currentDate() time.Time {
+	if g != nil && g.now != nil {
+		return g.now()
+	}
+	return time.Now()
+}
+
+func metadataLine(ctx ReleaseContext) string {
+	parts := make([]string, 0, 2)
+	if ctx.CurrentVersion != "" {
+		parts = append(parts, "Previous release: "+displayVersion(ctx.CurrentVersion))
+	}
+	if strings.TrimSpace(ctx.Branch) != "" {
+		parts = append(parts, "Branch: "+strings.TrimSpace(ctx.Branch))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func classifyCommit(commit string) (string, string) {
+	trimmed := strings.TrimSpace(commit)
+	if trimmed == "" {
+		return "", ""
+	}
+
+	if breaking, ok := breakingChangeText(trimmed); ok {
+		return breakingChangesSection, breaking
+	}
+
+	header := firstLine(trimmed)
+	matches := conventionalHeaderPattern.FindStringSubmatch(header)
+	if len(matches) == 0 {
+		return otherChangesSection, header
+	}
+
+	if matches[3] == "!" {
+		return breakingChangesSection, header
+	}
+
+	switch strings.ToLower(matches[1]) {
+	case "feat":
+		return featuresSection, header
+	case "fix", "perf", "revert":
+		return bugFixesSection, header
+	default:
+		return otherChangesSection, header
+	}
+}
+
+func breakingChangeText(message string) (string, bool) {
+	for _, line := range strings.Split(message, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "BREAKING CHANGE:") {
+			return trimmed, true
+		}
+	}
+	return "", false
+}
+
+func firstLine(message string) string {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return ""
+	}
+	parts := strings.SplitN(message, "\n", 2)
+	return strings.TrimSpace(parts[0])
+}
+
+func displayVersion(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return "Unreleased"
+	}
+	if strings.HasPrefix(strings.ToLower(version), "v") {
+		return version
+	}
+	return "v" + version
+}
