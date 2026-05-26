@@ -1,43 +1,49 @@
 # generator-changelog-html
 
-HTML changelog generator plugin for Semantic Release.
+Generates an HTML changelog for the current release.
 
-Generates HTML changelog output from Semantic Release results.
+This plugin is distributed as the standalone Go binary `semrel-plugin-generator-changelog-html`. Semrel executes the binary as a subprocess, provides plugin configuration through `SEMREL_PLUGIN_*` environment variables, provides release context through `SEMREL_*` environment variables, reads standard output, and treats exit code `0` as success and any non-zero exit code as failure. Install the binary in `~/.semrel/plugins/` or anywhere on your `$PATH`.
 
-## Documentation
+## Installation
 
-- Docs (coming soon): <https://github.com/SemRels/semrel/tree/main/docs/plugins/generator-changelog-html>
-- Template source: <https://github.com/SemRels/plugin-template>
+```bash
+go install github.com/SemRels/generator-changelog-html/cmd/plugin@latest
+```
 
-## Repository Layout
+## Configuration
 
-`	ext
-cmd/plugin/              Plugin entry point
-internal/plugin/         Business logic scaffold
-internal/grpc/           gRPC transport scaffold
-proto/v1                 Symlink to the SemRel protobuf contract
-.github/workflows/       CI, release, and security automation
-`
-
-## Development
-
-`ash
-go build ./cmd/plugin
-go test ./...
-`
-
-## Configuration Example
-
-`yaml
+```yaml
 plugins:
   - name: generator-changelog-html
-    type: generator
-    config:
-      output: changelog.html
-      template: default
-      include_styles: true
-`
+    path: ~/.semrel/plugins/semrel-plugin-generator-changelog-html
+    env:
+      SEMREL_PLUGIN_TEMPLATE: ".semrel/templates/changelog.html.tmpl"
+      SEMREL_PLUGIN_CSS_FILE: ".semrel/templates/changelog.css"
+      SEMREL_PLUGIN_MAX_COMMITS: "100"
+```
 
-## Status
+## `SEMREL_PLUGIN_*` variables
 
-This repository is bootstrapped from SemRels/plugin-template and is ready for implementation.
+| Name | Required | Description | Default |
+| --- | --- | --- | --- |
+| `SEMREL_PLUGIN_TEMPLATE` | Optional | Path to a custom Go HTML template file. | Built-in template |
+| `SEMREL_PLUGIN_CSS_FILE` | Optional | Path to a CSS file included by the HTML template. | None |
+| `SEMREL_PLUGIN_MAX_COMMITS` | Optional | Maximum number of commits to include. | 100 |
+
+## `SEMREL_*` release context used
+
+| Variable | Description |
+| --- | --- |
+| `SEMREL_VERSION` | Resolved release version for the current run. |
+| `SEMREL_TAG_NAME` | Git tag name semrel will create or publish. |
+| `SEMREL_NEXT_VERSION` | Next version computed by semrel for the release. |
+| `SEMREL_CURRENT_VERSION` | Current version before the new release is applied. |
+| `SEMREL_BRANCH` | Git branch associated with the current release run. |
+
+## Example behavior
+
+The plugin renders a complete HTML changelog using the release metadata and recent commits, then writes the generated document to standard output for semrel to consume.
+
+## License
+
+Apache-2.0
