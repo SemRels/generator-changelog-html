@@ -1,6 +1,6 @@
 # generator-changelog-html
 
-[![Latest Release](https://img.shields.io/github/v/release/SemRels/generator-changelog-html?label=version\&color=blue)](https://github.com/SemRels/generator-changelog-html/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/SemRels/generator-changelog-html?label=version&color=blue)](https://github.com/SemRels/generator-changelog-html/releases/latest)
 
 Generates an HTML changelog for the current release.
 
