@@ -128,3 +128,128 @@ func TestGeneratorAIDisclosureOffByDefault(t *testing.T) {
 	require.NotContains(t, output, "🤖")
 	require.NotContains(t, output, "AI-Assisted Contributions")
 }
+
+func TestGeneratorNewContributors(t *testing.T) {
+	t.Parallel()
+
+	generator := &Generator{now: func() time.Time {
+		return time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	}}
+
+	ctx := ReleaseContext{
+		Version:       "1.4.0",
+		RepositoryURL: "https://github.com/SemRels/generator-changelog-html",
+		Commits:       []string{"feat: add login (#42)"},
+	}
+
+	t.Run("section rendered when first-time contributors present", func(t *testing.T) {
+		t.Parallel()
+
+		opts := DefaultGenerateOptions()
+		opts.Contributors = []Contributor{
+			{Name: "Alice", Login: "alice", FirstTime: true, FirstContributionPR: 42},
+			{Name: "Bob", Login: "bob", FirstTime: false, CommitCount: 3},
+		}
+
+		output := generator.Generate(ctx, opts)
+
+		require.Contains(t, output, "<h3>New Contributors</h3>")
+		require.Contains(t, output, "<a href=\"https://github.com/alice\">@alice</a>")
+		require.Contains(t, output, "<a href=\"https://github.com/SemRels/generator-changelog-html/pull/42\">#42</a>")
+		require.NotContains(t, output, "@bob")
+	})
+
+	t.Run("section skipped when contributors empty", func(t *testing.T) {
+		t.Parallel()
+
+		output := generator.Generate(ctx, DefaultGenerateOptions())
+		require.NotContains(t, output, "New Contributors")
+	})
+
+	t.Run("section skipped when disabled", func(t *testing.T) {
+		t.Parallel()
+
+		opts := DefaultGenerateOptions()
+		opts.NewContributors = false
+		opts.Contributors = []Contributor{{Name: "Alice", Login: "alice", FirstTime: true}}
+
+		output := generator.Generate(ctx, opts)
+		require.NotContains(t, output, "New Contributors")
+	})
+
+	t.Run("contributor names are escaped", func(t *testing.T) {
+		t.Parallel()
+
+		opts := DefaultGenerateOptions()
+		opts.Contributors = []Contributor{
+			{Name: "<script>alert(1)</script>", FirstTime: true, FirstContributionLabel: "#7"},
+		}
+
+		output := generator.Generate(ctx, opts)
+
+		require.Contains(t, output, "&lt;script&gt;alert(1)&lt;/script&gt;")
+		require.NotContains(t, output, "<script>alert(1)</script>")
+	})
+}
+
+func TestGeneratorReleaseMVP(t *testing.T) {
+	t.Parallel()
+
+	generator := &Generator{now: func() time.Time {
+		return time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	}}
+
+	ctx := ReleaseContext{
+		Version:       "1.4.0",
+		RepositoryURL: "https://github.com/SemRels/generator-changelog-html",
+		Commits:       []string{"feat: add login (#42)", "fix: patch (#42)", "fix: docs (#99)"},
+	}
+
+	t.Run("mvp rendered when enabled", func(t *testing.T) {
+		t.Parallel()
+
+		opts := DefaultGenerateOptions()
+		opts.MVP = true
+		opts.Contributors = []Contributor{
+			{Name: "Alice", Login: "alice", CommitCount: 4},
+			{Name: "Bob", Login: "bob", CommitCount: 2},
+		}
+
+		output := generator.Generate(ctx, opts)
+
+		require.Contains(t, output, "<h3>🏆 Release MVP</h3>")
+		require.Contains(t, output, "<a href=\"https://github.com/alice\">@alice</a> led the contributors this release.")
+	})
+
+	t.Run("mvp skipped when disabled", func(t *testing.T) {
+		t.Parallel()
+
+		opts := DefaultGenerateOptions()
+		opts.Contributors = []Contributor{{Name: "Alice", Login: "alice", CommitCount: 4}}
+
+		output := generator.Generate(ctx, opts)
+		require.NotContains(t, output, "Release MVP")
+	})
+
+	t.Run("mvp skipped when contributors absent", func(t *testing.T) {
+		t.Parallel()
+
+		opts := DefaultGenerateOptions()
+		opts.MVP = true
+
+		output := generator.Generate(ctx, opts)
+		require.NotContains(t, output, "Release MVP")
+	})
+}
+
+func TestPickMVPFallsBackToCommitMatching(t *testing.T) {
+	t.Parallel()
+
+	mvp := pickMVP([]Contributor{
+		{Name: "Alice", Login: "alice", FirstContributionPR: 42},
+		{Name: "Bob", Login: "bob", FirstContributionPR: 99},
+	}, []string{"feat: add login (#42)", "fix: patch (#42)", "fix: docs (#99)"}, "commits")
+
+	require.NotNil(t, mvp)
+	require.Equal(t, "alice", mvp.Login)
+}
