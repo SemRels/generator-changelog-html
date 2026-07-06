@@ -100,3 +100,118 @@ func TestReleaseContextFromEnvUsesVersionFallback(t *testing.T) {
 	require.Equal(t, "1.9.0", ctx.CurrentVersion)
 	require.Equal(t, "release/main", ctx.Branch)
 }
+
+func TestContributorsFromEnv(t *testing.T) {
+	t.Parallel()
+
+	t.Run("uses primary semrel contributors payload", func(t *testing.T) {
+		t.Parallel()
+
+		contributors := contributorsFromEnv(func(key string) string {
+			switch key {
+			case "SEMREL_CONTRIBUTORS":
+				return `[{"name":"Alice","login":"alice","commits":3,"firstContribution":{"number":42,"url":"https://github.com/SemRels/generator-changelog-html/pull/42"}}]`
+			case "SEMREL_PLUGIN_CONTRIBUTORS_JSON":
+				return `[{"name":"Legacy","login":"legacy","pr":7}]`
+			}
+			return ""
+		})
+
+		require.Len(t, contributors, 1)
+		require.Equal(t, "alice", contributors[0].Login)
+		require.Equal(t, 3, contributors[0].CommitCount)
+		require.True(t, contributors[0].FirstTime)
+		require.Equal(t, "#42", contributors[0].FirstContributionLabel)
+	})
+
+	t.Run("falls back to legacy contributor payload", func(t *testing.T) {
+		t.Parallel()
+
+		contributors := contributorsFromEnv(func(key string) string {
+			if key == "SEMREL_PLUGIN_CONTRIBUTORS_JSON" {
+				return `[{"name":"Alice","login":"alice","pr":42}]`
+			}
+			return ""
+		})
+
+		require.Len(t, contributors, 1)
+		require.True(t, contributors[0].FirstTime)
+		require.Equal(t, 42, contributors[0].FirstContributionPR)
+	})
+
+	t.Run("invalid payloads are skipped", func(t *testing.T) {
+		t.Parallel()
+
+		contributors := contributorsFromEnv(func(key string) string {
+			if key == "SEMREL_CONTRIBUTORS" {
+				return `[`
+			}
+			return ""
+		})
+
+		require.Nil(t, contributors)
+	})
+
+	t.Run("missing payload returns nil", func(t *testing.T) {
+		t.Parallel()
+
+		require.Nil(t, contributorsFromEnv(func(string) string { return "" }))
+	})
+}
+
+func TestContributorWarnings(t *testing.T) {
+	t.Parallel()
+
+	warnings := contributorWarnings(func(key string) string {
+		if key == "SEMREL_CONTRIBUTORS" {
+			return `[`
+		}
+		return ""
+	})
+
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], "SEMREL_CONTRIBUTORS")
+}
+
+func TestRunIgnoresInvalidContributorJSON(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(&stdout, &stderr, func(key string) string {
+		switch key {
+		case "SEMREL_VERSION":
+			return "1.3.0"
+		case "SEMREL_COMMITS":
+			return `["feat: add search"]`
+		case "SEMREL_PLUGIN_FIRST_TIME_CONTRIBUTORS":
+			return "true"
+		case "SEMREL_CONTRIBUTORS":
+			return `[`
+		}
+		return ""
+	})
+
+	require.Equal(t, 0, code)
+	require.Contains(t, stderr.String(), "invalid SEMREL_CONTRIBUTORS JSON: ignored")
+	require.NotContains(t, stdout.String(), "New Contributors")
+}
+
+func TestEnvBoolSynonyms(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, envBoolSynonyms(func(key string) string {
+		if key == "SEMREL_PLUGIN_NEW_CONTRIBUTORS" {
+			return "true"
+		}
+		return ""
+	}, false, "SEMREL_PLUGIN_FIRST_TIME_CONTRIBUTORS", "SEMREL_PLUGIN_NEW_CONTRIBUTORS"))
+
+	require.False(t, envBoolSynonyms(func(key string) string {
+		if key == "SEMREL_PLUGIN_FIRST_TIME_CONTRIBUTORS" {
+			return "false"
+		}
+		return ""
+	}, true, "SEMREL_PLUGIN_FIRST_TIME_CONTRIBUTORS", "SEMREL_PLUGIN_NEW_CONTRIBUTORS"))
+}
