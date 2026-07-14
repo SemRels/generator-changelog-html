@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://registry.semrel.io/schemas/plugins/generator-changelog-html/v1.json",
+  "$id": "https://registry.semrel.io/schemas/plugins/changelog-html/v1.json",
   "title": "generator-changelog-html plugin configuration",
   "description": "Schema v1 for the generator-changelog-html semrel plugin. Configure via SEMREL_* environment variables.",
   "type": "object",
