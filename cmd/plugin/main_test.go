@@ -38,6 +38,57 @@ func TestRunWritesHTML(t *testing.T) {
 	require.Contains(t, stdout.String(), "<h3>Features</h3>")
 }
 
+func TestRunWithCustomSectionsJSON(t *testing.T) {
+	t.Parallel()
+
+	getenv := func(key string) string {
+		switch key {
+		case "SEMREL_VERSION":
+			return "1.3.0"
+		case "SEMREL_COMMITS":
+			return `["feat: add search", "docs: update README", "chore: tidy up"]`
+		case "SEMREL_PLUGIN_SECTIONS_JSON":
+			return `[{"type":"feat","section":"Highlights"},{"type":"docs","hidden":true}]`
+		}
+		return ""
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(&stdout, &stderr, getenv)
+
+	require.Equal(t, 0, code)
+	require.Contains(t, stdout.String(), "<h3>Highlights</h3>")
+	require.Contains(t, stdout.String(), "feat: add search")
+	require.NotContains(t, stdout.String(), "update README")
+	require.Contains(t, stdout.String(), "<h3>Other Changes</h3>")
+	require.Contains(t, stdout.String(), "chore: tidy up")
+}
+
+func TestRunIgnoresInvalidSectionsJSON(t *testing.T) {
+	t.Parallel()
+
+	getenv := func(key string) string {
+		switch key {
+		case "SEMREL_COMMITS":
+			return `["feat: add search"]`
+		case "SEMREL_PLUGIN_SECTIONS_JSON":
+			return `[`
+		}
+		return ""
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(&stdout, &stderr, getenv)
+
+	require.Equal(t, 0, code)
+	require.Contains(t, stderr.String(), "invalid SEMREL_PLUGIN_SECTIONS_JSON")
+	require.Contains(t, stdout.String(), "<h3>Features</h3>")
+}
+
 func TestRunRejectsInvalidCommitJSON(t *testing.T) {
 	t.Parallel()
 
