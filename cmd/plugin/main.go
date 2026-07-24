@@ -24,7 +24,7 @@ func run(stdout, stderr io.Writer, getenv func(string) string) int {
 	_, _ = fmt.Fprintf(stderr, "plugin_schema_version=%d\n", pluginSchemaVersion)
 	ctx, err := releaseContextFromEnv(getenv)
 	if err != nil {
-		fmt.Fprintln(stderr, "generator-changelog-html:", err)
+		_, _ = fmt.Fprintln(stderr, "generator-changelog-html:", err)
 		return 1
 	}
 
@@ -41,12 +41,12 @@ func run(stdout, stderr io.Writer, getenv func(string) string) int {
 		options.MVPMetric = metric
 	}
 	for _, warning := range contributorWarnings(getenv) {
-		fmt.Fprintln(stderr, "generator-changelog-html:", warning)
+		_, _ = fmt.Fprintln(stderr, "generator-changelog-html:", warning)
 	}
 	options.Contributors = contributorsFromEnv(getenv)
 
 	if _, err := io.WriteString(stdout, plugin.New().Generate(ctx, options)); err != nil {
-		fmt.Fprintln(stderr, "generator-changelog-html:", err)
+		_, _ = fmt.Fprintln(stderr, "generator-changelog-html:", err)
 		return 1
 	}
 
