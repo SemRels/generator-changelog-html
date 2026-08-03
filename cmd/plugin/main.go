@@ -41,21 +41,21 @@ func run(stdout, stderr io.Writer, getenv func(string) string) int {
 		options.MVPMetric = metric
 	}
 	for _, warning := range contributorWarnings(getenv) {
-		fmt.Fprintln(stderr, "generator-changelog-html:", warning)
+		_, _ = fmt.Fprintln(stderr, "generator-changelog-html:", warning)
 	}
 	options.Contributors = contributorsFromEnv(getenv)
 
 	if raw := strings.TrimSpace(getenv("SEMREL_PLUGIN_SECTIONS_JSON")); raw != "" {
 		var sections []plugin.SectionRule
 		if err := json.Unmarshal([]byte(raw), &sections); err != nil {
-			fmt.Fprintln(stderr, "generator-changelog-html: invalid SEMREL_PLUGIN_SECTIONS_JSON: ignored")
+			_, _ = fmt.Fprintln(stderr, "generator-changelog-html: invalid SEMREL_PLUGIN_SECTIONS_JSON: ignored")
 		} else {
 			options.Sections = sections
 		}
 	}
 
 	if _, err := io.WriteString(stdout, plugin.New().Generate(ctx, options)); err != nil {
-		fmt.Fprintln(stderr, "generator-changelog-html:", err)
+		_, _ = fmt.Fprintln(stderr, "generator-changelog-html:", err)
 		return 1
 	}
 

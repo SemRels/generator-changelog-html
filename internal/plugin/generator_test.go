@@ -79,6 +79,22 @@ func TestGeneratorGenerateWithCustomSections(t *testing.T) {
 	require.Equal(t, "<section class=\"changelog-entry\">\n  <h2>v1.3.0 <small>2026-05-25</small></h2>\n  <h3>Highlights</h3>\n  <ul>\n    <li>feat: add search</li>\n  </ul>\n  <h3>Bugfixes</h3>\n  <ul>\n    <li>fix: resolve issue with X</li>\n  </ul>\n  <h3>Other Changes</h3>\n  <ul>\n    <li>chore: tidy up</li>\n  </ul>\n</section>", output)
 }
 
+func TestGeneratorGenerateWithEmptyCustomSectionUsesFallback(t *testing.T) {
+	t.Parallel()
+
+	opts := DefaultGenerateOptions()
+	opts.NewContributors = false
+	opts.Sections = []SectionRule{{Type: "chore"}}
+
+	output := New().Generate(ReleaseContext{
+		Version: "1.3.0",
+		Commits: []string{"chore: tidy up"},
+	}, opts)
+
+	require.Contains(t, output, "<h3>Other Changes</h3>")
+	require.Contains(t, output, "chore: tidy up")
+}
+
 func TestGeneratorGenerateWithCustomSectionsKeepsBreakingChangesFirst(t *testing.T) {
 	t.Parallel()
 

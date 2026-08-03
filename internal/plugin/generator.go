@@ -255,7 +255,7 @@ func classifyCommit(commit string, options GenerateOptions) (string, string) {
 		}
 		section := strings.TrimSpace(rule.Section)
 		if section == "" {
-			return "", ""
+			return otherChangesSection, header
 		}
 		return section, header
 	}
