@@ -46,6 +46,22 @@ const (
 	otherChangesSection    = "Other Changes"
 )
 
+// SectionRule maps a conventional-commit type to a custom changelog section
+// heading, mirroring the "presetConfig.types" mapping supported by
+// @semantic-release/release-notes-generator. When Hidden is true, commits of
+// this Type are omitted from the changelog entirely (Section is ignored).
+type SectionRule struct {
+	// Type is the conventional-commit type this rule applies to (e.g. "feat",
+	// "fix", "chore"). Matching is case-insensitive.
+	Type string `json:"type"`
+	// Section is the changelog heading commits of this Type are grouped under
+	// (e.g. "Features", "Dependencies"). Ignored when Hidden is true.
+	Section string `json:"section,omitempty"`
+	// Hidden, when true, drops commits of this Type from the changelog instead
+	// of assigning them to a section.
+	Hidden bool `json:"hidden,omitempty"`
+}
+
 type ReleaseContext struct {
 	Version        string
 	CurrentVersion string
@@ -63,6 +79,12 @@ type GenerateOptions struct {
 	AIDisclosure        bool
 	AIDisclosureBadge   string
 	AIDisclosureSection bool
+	// Sections, when non-empty, overrides the built-in feat/fix→section
+	// mapping used to group changelog entries. Types without a matching rule
+	// fall back to the "Other Changes" section. BREAKING CHANGE commits and
+	// commits with a "!" marker are always placed in "Breaking Changes"
+	// regardless of Sections.
+	Sections []SectionRule
 }
 
 type Generator struct {
@@ -104,7 +126,7 @@ func (g *Generator) Generate(ctx ReleaseContext, options ...GenerateOptions) str
 	var aiEntries []aiEntry
 
 	for _, commit := range ctx.Commits {
-		section, line := classifyCommit(commit)
+		section, line := classifyCommit(commit, generateOptions)
 		if section == "" || line == "" {
 			continue
 		}
@@ -131,7 +153,7 @@ func (g *Generator) Generate(ctx ReleaseContext, options ...GenerateOptions) str
 		fmt.Fprintf(&builder, "  <p>%s</p>\n", html.EscapeString(meta))
 	}
 
-	for _, section := range []string{breakingChangesSection, featuresSection, bugFixesSection, otherChangesSection} {
+	for _, section := range sectionOrder(generateOptions) {
 		lines := sections[section]
 		if len(lines) == 0 {
 			continue
@@ -205,7 +227,7 @@ func metadataLine(ctx ReleaseContext) string {
 	return strings.Join(parts, " · ")
 }
 
-func classifyCommit(commit string) (string, string) {
+func classifyCommit(commit string, options GenerateOptions) (string, string) {
 	trimmed := strings.TrimSpace(commit)
 	if trimmed == "" {
 		return "", ""
@@ -225,7 +247,27 @@ func classifyCommit(commit string) (string, string) {
 		return breakingChangesSection, header
 	}
 
-	switch strings.ToLower(matches[1]) {
+	commitType := strings.ToLower(matches[1])
+
+	if rule, ok := findSectionRule(options.Sections, commitType); ok {
+		if rule.Hidden {
+			return "", ""
+		}
+		section := strings.TrimSpace(rule.Section)
+		if section == "" {
+			return otherChangesSection, header
+		}
+		return section, header
+	}
+
+	if len(options.Sections) > 0 {
+		// A custom mapping is configured but doesn't cover this type; bucket it
+		// with the other unmapped commits instead of applying the built-in
+		// feat/fix defaults.
+		return otherChangesSection, header
+	}
+
+	switch commitType {
 	case "feat":
 		return featuresSection, header
 	case "fix", "perf", "revert":
@@ -233,6 +275,46 @@ func classifyCommit(commit string) (string, string) {
 	default:
 		return otherChangesSection, header
 	}
+}
+
+// findSectionRule returns the first rule whose Type matches commitType
+// case-insensitively.
+func findSectionRule(rules []SectionRule, commitType string) (SectionRule, bool) {
+	for _, rule := range rules {
+		if strings.EqualFold(strings.TrimSpace(rule.Type), commitType) {
+			return rule, true
+		}
+	}
+	return SectionRule{}, false
+}
+
+// sectionOrder returns the changelog section headings in the order they
+// should be rendered. Without a custom Sections mapping this is the built-in
+// fixed order. With a custom mapping, "Breaking Changes" still comes first,
+// followed by each distinct configured section in declaration order, and
+// finally "Other Changes" for any commit types the mapping doesn't cover.
+func sectionOrder(options GenerateOptions) []string {
+	if len(options.Sections) == 0 {
+		return []string{breakingChangesSection, featuresSection, bugFixesSection, otherChangesSection}
+	}
+
+	order := []string{breakingChangesSection}
+	seen := map[string]bool{breakingChangesSection: true}
+	for _, rule := range options.Sections {
+		if rule.Hidden {
+			continue
+		}
+		section := strings.TrimSpace(rule.Section)
+		if section == "" || seen[section] {
+			continue
+		}
+		seen[section] = true
+		order = append(order, section)
+	}
+	if !seen[otherChangesSection] {
+		order = append(order, otherChangesSection)
+	}
+	return order
 }
 
 func breakingChangeText(message string) (string, bool) {

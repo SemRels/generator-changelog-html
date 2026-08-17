@@ -42,13 +42,91 @@ func TestMetadataLine(t *testing.T) {
 func TestClassifyCommit(t *testing.T) {
 	t.Parallel()
 
-	section, line := classifyCommit("feat: add endpoint\n\nBREAKING CHANGE: API changed")
+	section, line := classifyCommit("feat: add endpoint\n\nBREAKING CHANGE: API changed", DefaultGenerateOptions())
 	require.Equal(t, breakingChangesSection, section)
 	require.Equal(t, "BREAKING CHANGE: API changed", line)
 
-	section, line = classifyCommit("docs: update README")
+	section, line = classifyCommit("docs: update README", DefaultGenerateOptions())
 	require.Equal(t, otherChangesSection, section)
 	require.Equal(t, "docs: update README", line)
+}
+
+func TestGeneratorGenerateWithCustomSections(t *testing.T) {
+	t.Parallel()
+
+	generator := &Generator{now: func() time.Time {
+		return time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	}}
+
+	opts := DefaultGenerateOptions()
+	opts.NewContributors = false
+	opts.Sections = []SectionRule{
+		{Type: "feat", Section: "Highlights"},
+		{Type: "fix", Section: "Bugfixes"},
+		{Type: "docs", Hidden: true},
+	}
+
+	output := generator.Generate(ReleaseContext{
+		Version: "1.3.0",
+		Commits: []string{
+			"feat: add search",
+			"fix: resolve issue with X",
+			"docs: update README",
+			"chore: tidy up",
+		},
+	}, opts)
+
+	require.Equal(t, "<section class=\"changelog-entry\">\n  <h2>v1.3.0 <small>2026-05-25</small></h2>\n  <h3>Highlights</h3>\n  <ul>\n    <li>feat: add search</li>\n  </ul>\n  <h3>Bugfixes</h3>\n  <ul>\n    <li>fix: resolve issue with X</li>\n  </ul>\n  <h3>Other Changes</h3>\n  <ul>\n    <li>chore: tidy up</li>\n  </ul>\n</section>", output)
+}
+
+func TestGeneratorGenerateWithEmptyCustomSectionUsesFallback(t *testing.T) {
+	t.Parallel()
+
+	opts := DefaultGenerateOptions()
+	opts.NewContributors = false
+	opts.Sections = []SectionRule{{Type: "chore"}}
+
+	output := New().Generate(ReleaseContext{
+		Version: "1.3.0",
+		Commits: []string{"chore: tidy up"},
+	}, opts)
+
+	require.Contains(t, output, "<h3>Other Changes</h3>")
+	require.Contains(t, output, "chore: tidy up")
+}
+
+func TestGeneratorGenerateWithCustomSectionsKeepsBreakingChangesFirst(t *testing.T) {
+	t.Parallel()
+
+	generator := &Generator{now: func() time.Time {
+		return time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	}}
+
+	opts := DefaultGenerateOptions()
+	opts.NewContributors = false
+	opts.Sections = []SectionRule{{Type: "feat", Section: "Highlights"}}
+
+	output := generator.Generate(ReleaseContext{
+		Version: "2.0.0",
+		Commits: []string{
+			"feat!: breaking change here",
+			"feat: add search",
+		},
+	}, opts)
+
+	require.Equal(t, "<section class=\"changelog-entry\">\n  <h2>v2.0.0 <small>2026-05-25</small></h2>\n  <h3>Breaking Changes</h3>\n  <ul>\n    <li>feat!: breaking change here</li>\n  </ul>\n  <h3>Highlights</h3>\n  <ul>\n    <li>feat: add search</li>\n  </ul>\n</section>", output)
+}
+
+func TestFindSectionRuleIsCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	rules := []SectionRule{{Type: "Feat", Section: "Features"}}
+	rule, ok := findSectionRule(rules, "feat")
+	require.True(t, ok)
+	require.Equal(t, "Features", rule.Section)
+
+	_, ok = findSectionRule(rules, "fix")
+	require.False(t, ok)
 }
 
 func TestGeneratorGenerateWithSignature(t *testing.T) {
