@@ -39,28 +39,30 @@ cosign verify ghcr.io/semrels/generator-changelog-html:latest \
 
 ```yaml
 plugins:
-  - name: generator-changelog-html
-    path: ~/.semrel/plugins/semrel-plugin-generator-changelog-html
-    env:
-      SEMREL_PLUGIN_TEMPLATE: ".semrel/templates/changelog.html.tmpl"
-      SEMREL_PLUGIN_CSS_FILE: ".semrel/templates/changelog.css"
-      SEMREL_PLUGIN_MAX_COMMITS: "100"
-      SEMREL_PLUGIN_FIRST_TIME_CONTRIBUTORS: "true"
-      SEMREL_PLUGIN_RELEASE_MVP: "true"
+  - uses: "@semrel/generator-changelog-html"
+    phase: generator
+    args:
+      template: ".semrel/templates/changelog.html.tmpl"
+      css_file: ".semrel/templates/changelog.css"
+      max_commits: "100"
+      first_time_contributors: "true"
+      release_mvp: "true"
 ```
 
-## `SEMREL_PLUGIN_*` variables
+## Options
 
-| Name | Required | Description | Default |
-| --- | --- | --- | --- |
-| `SEMREL_PLUGIN_TEMPLATE` | Optional | Path to a custom Go HTML template file. | Built-in template |
-| `SEMREL_PLUGIN_CSS_FILE` | Optional | Path to a CSS file included by the HTML template. | None |
-| `SEMREL_PLUGIN_MAX_COMMITS` | Optional | Maximum number of commits to include. | 100 |
-| `SEMREL_PLUGIN_SIGNATURE` | Optional | Append an opt-in footer element linking to `semrel.io` at the end of the generated HTML entry. | `false` |
-| `SEMREL_PLUGIN_FIRST_TIME_CONTRIBUTORS` | Optional | Append a **New Contributors** section when contributor data is available. Supports the legacy alias `SEMREL_PLUGIN_NEW_CONTRIBUTORS`. | `true` |
-| `SEMREL_PLUGIN_RELEASE_MVP` | Optional | Append a **🏆 Release MVP** section highlighting the top contributor for the release. Supports the legacy alias `SEMREL_PLUGIN_MVP`. | `false` |
-| `SEMREL_PLUGIN_CONTRIBUTORS_JSON` | Optional | Legacy contributor JSON payload. `SEMREL_CONTRIBUTORS` is preferred when semrel core provides it. | — |
-| `SEMREL_PLUGIN_MVP_METRIC` | Optional | Compatibility toggle for MVP scoring. `commits` picks the highest commit count; `impact` falls back to weighted commit heuristics when counts are unavailable. | `commits` |
+Every option can be set as an entry under `args` in `.semrel.yaml`. semrel passes each entry to the plugin as the environment variable shown in the table, so you can also set that variable directly (for example in your CI environment) instead of using `args`.
+
+| Argument | Environment variable | Required | Description | Default |
+| --- | --- | --- | --- | --- |
+| `template` | `SEMREL_PLUGIN_TEMPLATE` | Optional | Path to a custom Go HTML template file. | Built-in template |
+| `css_file` | `SEMREL_PLUGIN_CSS_FILE` | Optional | Path to a CSS file included by the HTML template. | None |
+| `max_commits` | `SEMREL_PLUGIN_MAX_COMMITS` | Optional | Maximum number of commits to include. | 100 |
+| `signature` | `SEMREL_PLUGIN_SIGNATURE` | Optional | Append an opt-in footer element linking to `semrel.io` at the end of the generated HTML entry. | `false` |
+| `first_time_contributors` | `SEMREL_PLUGIN_FIRST_TIME_CONTRIBUTORS` | Optional | Append a **New Contributors** section when contributor data is available. Supports the legacy alias `SEMREL_PLUGIN_NEW_CONTRIBUTORS`. | `true` |
+| `release_mvp` | `SEMREL_PLUGIN_RELEASE_MVP` | Optional | Append a **🏆 Release MVP** section highlighting the top contributor for the release. Supports the legacy alias `SEMREL_PLUGIN_MVP`. | `false` |
+| `contributors_json` | `SEMREL_PLUGIN_CONTRIBUTORS_JSON` | Optional | Legacy contributor JSON payload. `SEMREL_CONTRIBUTORS` is preferred when semrel core provides it. | — |
+| `mvp_metric` | `SEMREL_PLUGIN_MVP_METRIC` | Optional | Compatibility toggle for MVP scoring. `commits` picks the highest commit count; `impact` falls back to weighted commit heuristics when counts are unavailable. | `commits` |
 
 ## `SEMREL_*` release context used
 
