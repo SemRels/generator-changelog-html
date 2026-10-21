@@ -1,6 +1,10 @@
 # generator-changelog-html
 
 [![Latest Release](https://img.shields.io/github/v/release/SemRels/generator-changelog-html?label=version&color=blue)](https://github.com/SemRels/generator-changelog-html/releases/latest)
+[![CI](https://github.com/SemRels/generator-changelog-html/actions/workflows/ci.yml/badge.svg)](https://github.com/SemRels/generator-changelog-html/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/SemRels/generator-changelog-html)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/SemRels/generator-changelog-html/badge)](https://scorecard.dev/viewer/?uri=github.com/SemRels/generator-changelog-html)
+[![REUSE status](https://api.reuse.software/badge/github.com/SemRels/generator-changelog-html)](https://api.reuse.software/info/github.com/SemRels/generator-changelog-html)
 
 Generates an HTML changelog for the current release.
 
