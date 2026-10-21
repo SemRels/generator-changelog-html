@@ -1,6 +1,6 @@
 # Code of Conduct
 
-generator-changelog-html is committed to providing a welcoming and harassment-free community.
+`generator-changelog-html` is committed to providing a welcoming and harassment-free community.
 
 ## Our Pledge
 
