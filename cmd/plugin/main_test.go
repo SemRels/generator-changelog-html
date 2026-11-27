@@ -38,6 +38,37 @@ func TestRunWritesHTML(t *testing.T) {
 	require.Contains(t, stdout.String(), "<h3>Features</h3>")
 }
 
+func TestRunUsesSemrelContributorsForMVPAndNewContributorSections(t *testing.T) {
+	t.Parallel()
+
+	getenv := func(key string) string {
+		switch key {
+		case "SEMREL_VERSION":
+			return "1.3.0"
+		case "SEMREL_COMMITS":
+			return `["feat: improve release notes\n\nCo-authored-by: GitHub Copilot <copilot@github.com>"]`
+		case "SEMREL_CONTRIBUTORS":
+			return `[{"name":"Alice","commits":3,"firstContribution":true},{"name":"Bob","commits":1,"firstContribution":false}]`
+		case "SEMREL_PLUGIN_AI_DISCLOSURE", "SEMREL_PLUGIN_AI_DISCLOSURE_SECTION", "SEMREL_PLUGIN_MVP":
+			return "true"
+		}
+		return ""
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(&stdout, &stderr, getenv)
+
+	require.Equal(t, 0, code)
+	require.Contains(t, stdout.String(), "feat: improve release notes 🤖")
+	require.Contains(t, stdout.String(), "<h3>New Contributors</h3>")
+	require.Contains(t, stdout.String(), "Alice made their first contribution")
+	require.NotContains(t, stdout.String(), "Bob made their first contribution")
+	require.Contains(t, stdout.String(), "<h3>🏆 Release MVP</h3>")
+	require.Contains(t, stdout.String(), "AI-Assisted Contributions")
+}
+
 func TestRunWithCustomSectionsJSON(t *testing.T) {
 	t.Parallel()
 
@@ -173,6 +204,21 @@ func TestContributorsFromEnv(t *testing.T) {
 		require.Equal(t, 3, contributors[0].CommitCount)
 		require.True(t, contributors[0].FirstTime)
 		require.Equal(t, "#42", contributors[0].FirstContributionLabel)
+	})
+
+	t.Run("reads core first contribution booleans", func(t *testing.T) {
+		t.Parallel()
+
+		contributors := contributorsFromEnv(func(key string) string {
+			if key == "SEMREL_CONTRIBUTORS" {
+				return `[{"name":"Alice","commits":3,"firstContribution":true},{"name":"Bob","commits":1,"firstContribution":false}]`
+			}
+			return ""
+		})
+
+		require.Len(t, contributors, 2)
+		require.True(t, contributors[0].FirstTime)
+		require.False(t, contributors[1].FirstTime)
 	})
 
 	t.Run("falls back to legacy contributor payload", func(t *testing.T) {
